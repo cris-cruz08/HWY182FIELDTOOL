@@ -492,11 +492,12 @@ function asphaltCard(){
     </div>
     <div class="field"><label>Width (ft)</label><input id="a_width" type="number" step="0.1" placeholder="20"></div>
     <div class="field">
+          <div class="field" style="display:none;">
       <label>Pay Item</label>
       <select id="a_item">
         <option value="202-B007 Asphalt Removal">202-B007 — Asphalt Removal</option>
         <option value="202-B069 Concrete w/ Overlay Removal">202-B069 — Concrete w/ Overlay Removal</option>
-        <option value="Both (same footprint)">Both (same footprint — log once each)</option>
+        <option value="Both (same footprint)" selected>Both (same footprint — log once each)</option>
       </select>
     </div>
     <div id="a_result"></div>
@@ -736,9 +737,8 @@ function attachHandlers(){
 
 // --- Asphalt/Concrete ---
 function wireAsphalt(){
-  const ids = ['a_begin','a_end','a_width','a_item'];
+  const ids = ['a_begin','a_end','a_width'];
   ids.forEach(id=> document.getElementById(id).addEventListener('input', calcAsphalt));
-  document.getElementById('a_item').addEventListener('change', calcAsphalt);
   document.getElementById('a_save').addEventListener('click', saveAsphalt);
   calcAsphalt();
 }
@@ -747,7 +747,6 @@ function calcAsphalt(){
   const begin = staToFt(document.getElementById('a_begin').value);
   const end = staToFt(document.getElementById('a_end').value);
   const width = parseFloat(document.getElementById('a_width').value);
-  const item = document.getElementById('a_item').value;
   const resDiv = document.getElementById('a_result');
   const saveBtn = document.getElementById('a_save');
 
@@ -765,13 +764,15 @@ function calcAsphalt(){
         <div class="label">${length.toFixed(1)} LF × ${width} FT</div>
       </div>
       <div><span class="value">${sy.toFixed(1)}</span><span class="unit">SY</span></div>
-    </div>`;
-  asphaltState = {item, detail:`Sta ${document.getElementById('a_begin').value}–${document.getElementById('a_end').value}, ${width}' wide`, qty:sy, unit:'SY'};
+    </div>
+    <div class="note">Logs once each under 202-B007 Asphalt Removal and 202-B069 Concrete w/ Overlay Removal — same footprint, same ${sy.toFixed(1)} SY.</div>`;
+  asphaltState = {detail:`Sta ${document.getElementById('a_begin').value}–${document.getElementById('a_end').value}, ${width}' wide`, qty:sy, unit:'SY'};
   saveBtn.disabled = false;
 }
 function saveAsphalt(){
   if(!asphaltState) return;
-  addEntry(asphaltState);
+  addEntry({...asphaltState, item:'202-B007 Asphalt Removal'});
+  addEntry({...asphaltState, item:'202-B069 Concrete w/ Overlay Removal'});
 }
 
 // --- Curb & Gutter ---
