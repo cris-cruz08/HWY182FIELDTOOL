@@ -319,13 +319,20 @@ function findStructure(rawId){
 const HP_TRENCH_TABLE = { // nominal in -> min trench width ft (DPD-1 Table 1)
   12: 30/12, 15: 34/12, 18: 39/12, 24: 48/12, 30: 56/12, 36: 64/12, 42: 72/12, 48: 80/12, 60: 96/12
 };
-// RCP trench width: NOT the ASTM C76 Wall B / OD+2ft formula previously used here.
-// Reverse-engineered from EQ-7/EQ-8 Structure Excavation CU YD + EST. DEPTH for 45 clean,
-// single-size pipe segments across 18/24/30/54" RCP (median implied width landed within
-// ~0.1-0.5 ft of nominal diameter + 1.0 ft at every size — see chat for the full workup).
-// This is the design engineer's own quantity basis, not a derived/assumed formula.
+// RCP trench width — per the PE (2026-09-04): trench width = pipe OD + 12" on each side
+// (OD + 2.0 ft total); trench length = total running length of the trench, no separate
+// end-of-pipe allowance. OD is computed from nominal (inside) diameter using the standard
+// ASTM C76 Wall B thickness formula, t = D/12 + 1 (inches) — this matches the wall
+// thicknesses shown for 54"/60" pipe in the project's own Section 708 pipe table, so the
+// same formula is used across all sizes on this project (12"-60").
+// NOTE: this replaced an earlier nominal-diameter + 1.0 ft formula reverse-engineered from
+// EQ-7/EQ-8 quantities, which came in 1.3-2.0 ft narrower than this PE-confirmed width at
+// every size — any RCP entries logged before 2026-09-04 were computed under that narrower
+// formula and should be reviewed.
 function rcpTrenchWidthFt(diaIn){
-  return (diaIn/12) + 1;
+  const wallIn = (diaIn/12) + 1;       // ASTM C76 Wall B thickness, inches
+  const odIn = diaIn + 2*wallIn;       // outside diameter, inches
+  return (odIn/12) + 2;                // OD (ft) + 12" each side
 }
 // Returns {width, isFallback, nearestSize} instead of silently substituting.
 // The caller is responsible for surfacing isFallback to the user — this
@@ -431,8 +438,8 @@ function baseHTML(){
       </select>
     </div>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="b_begin" placeholder="26+45"></div>
-      <div class="field"><label>End Sta</label><input id="b_end" placeholder="37+00"></div>
+      <div class="field"><label>Begin Sta</label><input id="b_begin" inputmode="tel" placeholder="26+45"></div>
+      <div class="field"><label>End Sta</label><input id="b_end" inputmode="tel" placeholder="37+00"></div>
     </div>
     <div class="field">
       <label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet for this station range, or field-measure. Width varies constantly (turn lanes, medians, parking, bike lanes) — this tool does not look it up for you.</span></label>
@@ -480,8 +487,8 @@ function asphaltCard(){
     <h2>Asphalt &amp; Concrete Removal</h2>
     <p class="sub">202-B007 / 202-B069 — measured by area, all depths</p>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="a_begin" placeholder="68+20"></div>
-      <div class="field"><label>End Sta</label><input id="a_end" placeholder="69+35"></div>
+      <div class="field"><label>Begin Sta</label><input id="a_begin" inputmode="tel" placeholder="68+20"></div>
+      <div class="field"><label>End Sta</label><input id="a_end" inputmode="tel" placeholder="69+35"></div>
     </div>
     <div class="field"><label>Width (ft)</label><input id="a_width" type="number" step="0.1" placeholder="20"></div>
     <div class="field">
@@ -502,15 +509,15 @@ function curbCard(){
   <div class="card">
     <h2>Design Reference</h2>
     <p class="sub">Cross-check against EQ-1 curb &amp; gutter quantities, by station</p>
-    <div class="field"><label>Station</label><input id="cref_sta" placeholder="34+00"></div>
+    <div class="field"><label>Station</label><input id="cref_sta" inputmode="tel" placeholder="34+00"></div>
     <div id="cref_result"></div>
   </div>
   <div class="card">
     <h2>Curb &amp; Gutter Removal</h2>
     <p class="sub">202-B088 — linear feet, less driveway/gap openings</p>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="c_begin" placeholder="65+40"></div>
-      <div class="field"><label>End Sta</label><input id="c_end" placeholder="67+42"></div>
+      <div class="field"><label>Begin Sta</label><input id="c_begin" inputmode="tel" placeholder="65+40"></div>
+      <div class="field"><label>End Sta</label><input id="c_end" inputmode="tel" placeholder="67+42"></div>
     </div>
     <label style="display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:6px;">Gaps (driveways, inlets, etc. — width ft)</label>
     <div class="gaplist" id="c_gaps"></div>
@@ -525,15 +532,15 @@ function drivewayCard(){
   <div class="card">
     <h2>Design Reference</h2>
     <p class="sub">Cross-check against EQ-1 driveway quantities, by station</p>
-    <div class="field"><label>Station</label><input id="dref_sta" placeholder="65+03"></div>
+    <div class="field"><label>Station</label><input id="dref_sta" inputmode="tel" placeholder="65+03"></div>
     <div id="dref_result"></div>
   </div>
   <div class="card">
     <h2>Concrete Driveway Removal</h2>
     <p class="sub">202-B052 — measured by area, all depths. Enter each driveway separately.</p>
     <div class="row2">
-      <div class="field"><label>Begin Sta <span style="font-weight:400; color:var(--concrete);">(optional — auto-fills Width)</span></label><input id="d_begin" placeholder="63+74"></div>
-      <div class="field"><label>End Sta</label><input id="d_end" placeholder="64+50"></div>
+      <div class="field"><label>Begin Sta <span style="font-weight:400; color:var(--concrete);">(optional — auto-fills Width)</span></label><input id="d_begin" inputmode="tel" placeholder="63+74"></div>
+      <div class="field"><label>End Sta</label><input id="d_end" inputmode="tel" placeholder="64+50"></div>
     </div>
     <div class="field"><label>Station (for reference)</label><input id="d_sta" placeholder="65+03 RT"></div>
     <div class="row2">
@@ -550,15 +557,15 @@ function sidewalkCard(){
   <div class="card">
     <h2>Design Reference</h2>
     <p class="sub">Cross-check against EQ-1 sidewalk quantities, by station</p>
-    <div class="field"><label>Station</label><input id="swref_sta" placeholder="46+00"></div>
+    <div class="field"><label>Station</label><input id="swref_sta" inputmode="tel" placeholder="46+00"></div>
     <div id="swref_result"></div>
   </div>
   <div class="card">
     <h2>Concrete Sidewalk Removal</h2>
     <p class="sub">202-B080 — measured by area. Width varies by section (typically 4'-6') — check the typical section or field-measure.</p>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="sw_begin" placeholder="43+50"></div>
-      <div class="field"><label>End Sta</label><input id="sw_end" placeholder="49+50"></div>
+      <div class="field"><label>Begin Sta</label><input id="sw_begin" inputmode="tel" placeholder="43+50"></div>
+      <div class="field"><label>End Sta</label><input id="sw_end" inputmode="tel" placeholder="49+50"></div>
     </div>
     <div class="field"><label>Width (ft)</label><input id="sw_width" type="number" step="0.1" placeholder="5"></div>
     <div class="field"><label>Note <span style="font-weight:400; color:var(--concrete);">(optional — flag anything unusual about this entry for later reconciliation)</span></label><input id="sw_note" placeholder="e.g. width includes buffer/green space per inspector"></div>
@@ -582,8 +589,8 @@ function pipeHTML(){
     <h2>Pipe Install &amp; Structure Excavation</h2>
     <p class="sub">Auto-selects trench width by pipe material &amp; size</p>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="p_begin" placeholder="64+02"></div>
-      <div class="field"><label>End Sta</label><input id="p_end" placeholder="64+05"></div>
+      <div class="field"><label>Begin Sta</label><input id="p_begin" inputmode="tel" placeholder="64+02"></div>
+      <div class="field"><label>End Sta</label><input id="p_end" inputmode="tel" placeholder="64+05"></div>
     </div>
     <div class="field">
       <label>LF Override <span style="font-weight:400; color:var(--concrete);">(use for cross-drains / N&amp;S runs where station delta ≠ pipe length)</span></label>
@@ -1314,7 +1321,7 @@ function calcPipe(){
     ${fallbackWarningHTML}
     <div class="note">
       Pipe furnish &amp; install: <strong>${pipeLF.toFixed(1)} LF</strong> of ${size}" ${material}${dual ? ' (dual lay, 2 runs)':''}.<br>
-      Trench width source: ${material==='RCP' ? 'nominal diameter + 1 ft (reverse-engineered from EQ-7/EQ-8 design quantities)' : 'MDOT DPD-1 Table 1'}${dual ? `, using ${effectiveSize}" equivalent per dual-lay convention` : ''}.
+      Trench width source: ${material==='RCP' ? 'pipe OD + 1 ft each side, per PE (2026-09-04) — OD from ASTM C76 Wall B thickness' : 'MDOT DPD-1 Table 1'}${dual ? `, using ${effectiveSize}" equivalent per dual-lay convention` : ''}.
     </div>
   `;
   pipeState = [
