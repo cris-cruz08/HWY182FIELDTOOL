@@ -468,7 +468,8 @@ function removalHTML(){
     {id:'asphalt', label:'Asphalt/Conc'},
     {id:'curb', label:'Curb & Gutter'},
     {id:'driveway', label:'Driveway'},
-    {id:'sidewalk', label:'Sidewalk'}
+    {id:'sidewalk', label:'Sidewalk'},
+    {id:'sawcut', label:'Saw Cut'}
   ];
   const subtabs = subs.map(s=>`<div class="subtab ${currentSub===s.id?'active':''}" data-sub="${s.id}">${s.label}</div>`).join('');
 
@@ -476,6 +477,7 @@ function removalHTML(){
   if(currentSub === 'asphalt') body = asphaltCard();
   else if(currentSub === 'curb') body = curbCard();
   else if(currentSub === 'sidewalk') body = sidewalkCard();
+  else if(currentSub === 'sawcut') body = sawcutCard();
   else body = drivewayCard();
 
   return `<div class="subtabs">${subtabs}</div>${body}`;
@@ -491,8 +493,7 @@ function asphaltCard(){
       <div class="field"><label>End Sta</label><input id="a_end" inputmode="tel" placeholder="69+35"></div>
     </div>
     <div class="field"><label>Width (ft)</label><input id="a_width" type="number" step="0.1" placeholder="20"></div>
-    <div class="field">
-          <div class="field" style="display:none;">
+    <div class="field" style="display:none;">
       <label>Pay Item</label>
       <select id="a_item">
         <option value="202-B007 Asphalt Removal">202-B007 — Asphalt Removal</option>
@@ -525,6 +526,23 @@ function curbCard(){
     <button class="addgap" id="c_addgap" type="button">+ Add Gap</button>
     <div id="c_result" style="margin-top:14px;"></div>
     <button class="save-btn" id="c_save" disabled>Save Entry</button>
+  </div>`;
+}
+
+function sawcutCard(){
+  return `
+  <div class="card">
+    <h2>Saw Cut, Full Depth</h2>
+    <p class="sub">503-C010 — linear feet along the cut line, less gaps (driveways, side streets, existing joints)</p>
+    <div class="row2">
+      <div class="field"><label>Begin Sta</label><input id="sc_begin" inputmode="tel" placeholder="24+50"></div>
+      <div class="field"><label>End Sta</label><input id="sc_end" inputmode="tel" placeholder="28+45"></div>
+    </div>
+    <label style="display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:6px;">Gaps (driveways, side streets, existing joints — LF)</label>
+    <div class="gaplist" id="sc_gaps"></div>
+    <button class="addgap" id="sc_addgap" type="button">+ Add Gap</button>
+    <div id="sc_result" style="margin-top:14px;"></div>
+    <button class="save-btn" id="sc_save" disabled>Save Entry</button>
   </div>`;
 }
 
@@ -715,6 +733,7 @@ function attachHandlers(){
     if(currentSub === 'asphalt') wireAsphalt();
     else if(currentSub === 'curb') wireCurb();
     else if(currentSub === 'sidewalk') wireSidewalk();
+    else if(currentSub === 'sawcut') wireSawcut();
     else wireDriveway();
   } else if(currentTab === 'pipe'){
     wirePipe();
@@ -870,6 +889,63 @@ function calcCurb(){
 function saveCurb(){
   if(!curbState) return;
   addEntry(curbState);
+}
+
+function wireSawcut(){
+  document.getElementById('sc_addgap').addEventListener('click', ()=>{
+    addSawcutGapRow();
+    calcSawcut();
+  });
+  ['sc_begin','sc_end'].forEach(id=> document.getElementById(id).addEventListener('input', calcSawcut));
+  document.getElementById('sc_save').addEventListener('click', saveSawcut);
+  addSawcutGapRow(); // start with one
+  calcSawcut();
+}
+function addSawcutGapRow(){
+  const wrap = document.getElementById('sc_gaps');
+  const row = document.createElement('div');
+  row.className = 'gaprow';
+  row.innerHTML = `<input type="number" step="0.1" placeholder="gap LF" class="sc_gap_input"><button type="button" class="sc_gap_del">✕</button>`;
+  wrap.appendChild(row);
+  row.querySelector('.sc_gap_input').addEventListener('input', calcSawcut);
+  row.querySelector('.sc_gap_del').addEventListener('click', ()=>{ row.remove(); calcSawcut(); });
+}
+let sawcutState = null;
+function calcSawcut(){
+  const begin = staToFt(document.getElementById('sc_begin').value);
+  const end = staToFt(document.getElementById('sc_end').value);
+  const resDiv = document.getElementById('sc_result');
+  const saveBtn = document.getElementById('sc_save');
+  const gapInputs = Array.from(document.querySelectorAll('.sc_gap_input'));
+  const gaps = gapInputs.map(i=>parseFloat(i.value)).filter(v=>!isNaN(v) && v>0);
+  const gapTotal = gaps.reduce((a,b)=>a+b,0);
+
+  if(begin===null || end===null || end<=begin){
+    resDiv.innerHTML = '';
+    saveBtn.disabled = true;
+    sawcutState = null;
+    return;
+  }
+  const total = end - begin;
+  const net = total - gapTotal;
+  const warnMode = net < 0;
+  resDiv.innerHTML = `
+    <div class="result ${warnMode?'warn':''}">
+      <div>
+        <div class="label">${total.toFixed(1)} LF range − ${gapTotal.toFixed(1)} LF gaps</div>
+      </div>
+      <div><span class="value">${net.toFixed(1)}</span><span class="unit">LF</span></div>
+    </div>`;
+  if(warnMode){
+    saveBtn.disabled = true;
+    return;
+  }
+  sawcutState = {item:'503-C010 Saw Cut, Full Depth', detail:`Sta ${document.getElementById('sc_begin').value}–${document.getElementById('sc_end').value}, gaps: ${gaps.join(', ')||'none'}`, qty:net, unit:'LF'};
+  saveBtn.disabled = false;
+}
+function saveSawcut(){
+  if(!sawcutState) return;
+  addEntry(sawcutState);
 }
 
 // --- Driveway ---
