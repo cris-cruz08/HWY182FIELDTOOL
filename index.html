@@ -426,38 +426,65 @@ function render(){
 
 // ---------- Base tab ----------
 function baseHTML(){
+  const subs = [
+    {id:'geotextile', label:'Geotextile'},
+    {id:'crushedstone', label:'Crushed Stone'}
+  ];
+  const effSub = currentSub === 'geotextile' ? 'geotextile' : 'crushedstone';
+  const subtabs = subs.map(s=>`<div class="subtab ${effSub===s.id?'active':''}" data-sub="${s.id}">${s.label}</div>`).join('');
+
+  const body = effSub === 'geotextile' ? geotextileCard() : crushedStoneCard();
+
+  return `<div class="subtabs">${subtabs}</div>${body}`;
+}
+
+function geotextileCard(){
   return `
   <div class="card">
-    <h2>Crushed Stone Base &amp; Geotextile Fabric</h2>
-    <p class="sub">Per Typical Sections TS-1–TS-4. Two conditions apply — pick the one that governs at this station.</p>
+    <h2>Geotextile Fabric</h2>
+    <p class="sub">209-A005 — Geotextile Stabilization, Type V, Non-Woven — SY. Only under the 12" crushed stone base template (mainline travel-way) — not used under the 6" curb-integral base.</p>
+    <div class="row2">
+      <div class="field"><label>Begin Sta</label><input id="geo_begin" inputmode="tel" placeholder="26+45"></div>
+      <div class="field"><label>End Sta</label><input id="geo_end" inputmode="tel" placeholder="37+00"></div>
+    </div>
+    <div class="field">
+      <label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet for this station range, or field-measure.</span></label>
+      <input id="geo_width" type="number" step="0.1" placeholder="24">
+    </div>
+    <div id="geo_result"></div>
+    <button class="save-btn" id="geo_save" disabled>Save Entry</button>
+  </div>`;
+}
+
+function crushedStoneCard(){
+  return `
+  <div class="card">
+    <h2>Crushed Stone Base</h2>
+    <p class="sub">304-F003 — Crushed Stone Base, paid by the TON. Two conditions apply — pick the one that governs at this station.</p>
     <div class="field">
       <label>Condition</label>
-      <select id="b_condition">
-        <option value="12in">12.0" Crushed Limestone Base w/ Type V Geotextile — mainline travel-way template</option>
-        <option value="6in">6.0" Crushed Limestone Base, no geotextile — curb-integral sidewalk sections</option>
+      <select id="cs_condition">
+        <option value="12in">12.0" Crushed Limestone Base — mainline travel-way template (under geotextile)</option>
+        <option value="6in">6.0" Crushed Limestone Base — curb-integral sidewalk sections (no geotextile)</option>
       </select>
     </div>
     <div class="row2">
-      <div class="field"><label>Begin Sta</label><input id="b_begin" inputmode="tel" placeholder="26+45"></div>
-      <div class="field"><label>End Sta</label><input id="b_end" inputmode="tel" placeholder="37+00"></div>
+      <div class="field"><label>Begin Sta</label><input id="cs_begin" inputmode="tel" placeholder="26+45"></div>
+      <div class="field"><label>End Sta</label><input id="cs_end" inputmode="tel" placeholder="37+00"></div>
     </div>
     <div class="field">
-      <label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet for this station range, or field-measure. Width varies constantly (turn lanes, medians, parking, bike lanes) — this tool does not look it up for you.</span></label>
-      <input id="b_width" type="number" step="0.1" placeholder="24">
+      <label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet for this station range, or field-measure.</span></label>
+      <input id="cs_width" type="number" step="0.1" placeholder="24">
     </div>
-    <div id="b_result"></div>
-    <div class="note" id="b_geotextile_note" style="display:none;">
-      Geotextile Fabric (209-A005) is a real SY pay item — the figure above is loggable.
-    </div>
-    <button class="save-btn" id="b_save" disabled>Save Geotextile Entry</button>
-    <div class="fallback-warning" style="margin-top:12px;">
-      ⚠ <strong>Crushed Stone Base (304-F003) is paid by the TON, not by area.</strong>
-      Tonnage depends on compacted density, which this tool has no verified figure for — the SY footprint above is a planning estimate only. Track actual 304-F003 quantities from supplier weigh tickets, not this calculator.
-    </div>
+    <div id="cs_result"></div>
     <div class="field" style="background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:12px; margin-top:12px;">
-      <label>Unit Weight (tons per CY) <span style="font-weight:400; color:var(--concrete);">— optional. Get this from a supplier ticket, spec sheet, or the PE. Left blank on purpose — this tool won't guess a density for you.</span></label>
-      <input id="b_density" type="number" step="0.01" placeholder="e.g. 1.35 — confirm before using">
-      <div id="b_tons_result" style="display:none; margin-top:10px;"></div>
+      <label>Unit Weight (tons per CY) <span style="font-weight:400; color:var(--concrete);">— per the PM: 1.4 tons/CY for this project's stone. Override below if that ever changes.</span></label>
+      <input id="cs_density" type="number" step="0.01" value="1.4" placeholder="e.g. 1.35">
+      <div id="cs_tons_result" style="display:none; margin-top:10px;"></div>
+    </div>
+    <button class="save-btn" id="cs_save" disabled>Save Entry</button>
+    <div class="note" style="margin-top:12px;">
+      304-F003 and 209-A005 are separate pay items and are always logged as separate entries, even when both apply to the same footprint. Confirm against supplier weigh tickets if there's ever a discrepancy with this tonnage estimate.
     </div>
   </div>`;
 }
@@ -471,13 +498,19 @@ function removalHTML(){
     {id:'sidewalk', label:'Sidewalk'},
     {id:'sawcut', label:'Saw Cut'}
   ];
-  const subtabs = subs.map(s=>`<div class="subtab ${currentSub===s.id?'active':''}" data-sub="${s.id}">${s.label}</div>`).join('');
+  let effSub;
+  if(currentSub === 'asphalt') effSub = 'asphalt';
+  else if(currentSub === 'curb') effSub = 'curb';
+  else if(currentSub === 'sidewalk') effSub = 'sidewalk';
+  else if(currentSub === 'sawcut') effSub = 'sawcut';
+  else effSub = 'driveway';
+  const subtabs = subs.map(s=>`<div class="subtab ${effSub===s.id?'active':''}" data-sub="${s.id}">${s.label}</div>`).join('');
 
   let body = '';
-  if(currentSub === 'asphalt') body = asphaltCard();
-  else if(currentSub === 'curb') body = curbCard();
-  else if(currentSub === 'sidewalk') body = sidewalkCard();
-  else if(currentSub === 'sawcut') body = sawcutCard();
+  if(effSub === 'asphalt') body = asphaltCard();
+  else if(effSub === 'curb') body = curbCard();
+  else if(effSub === 'sidewalk') body = sidewalkCard();
+  else if(effSub === 'sawcut') body = sawcutCard();
   else body = drivewayCard();
 
   return `<div class="subtabs">${subtabs}</div>${body}`;
@@ -737,7 +770,8 @@ function attachHandlers(){
   } else if(currentTab === 'pipe'){
     wirePipe();
   } else if(currentTab === 'base'){
-    wireBase();
+    if(currentSub === 'geotextile') wireGeotextile();
+    else wireCrushedStone();
   } else {
     const exp = document.getElementById('exportCsv');
     if(exp) exp.addEventListener('click', exportCSV);
@@ -1254,37 +1288,73 @@ function renderStructureLookup(){
   resDiv.innerHTML = html;
 }
 
-// --- Base (Crushed Stone / Geotextile) ---
-function wireBase(){
-  ['b_condition','b_begin','b_end','b_width','b_density'].forEach(id=>{
-    document.getElementById(id).addEventListener('input', calcBase);
-    document.getElementById(id).addEventListener('change', calcBase);
-  });
-  document.getElementById('b_save').addEventListener('click', saveBase);
-  calcBase();
+// --- Base: Geotextile ---
+function wireGeotextile(){
+  ['geo_begin','geo_end','geo_width'].forEach(id=> document.getElementById(id).addEventListener('input', calcGeotextile));
+  document.getElementById('geo_save').addEventListener('click', saveGeotextile);
+  calcGeotextile();
 }
-let baseState = null;
-function calcBase(){
-  const condition = document.getElementById('b_condition').value;
-  const begin = staToFt(document.getElementById('b_begin').value);
-  const end = staToFt(document.getElementById('b_end').value);
-  const width = parseFloat(document.getElementById('b_width').value);
-  const density = parseFloat(document.getElementById('b_density').value); // tons per CY, user-supplied
-  const resDiv = document.getElementById('b_result');
-  const saveBtn = document.getElementById('b_save');
-  const geoNote = document.getElementById('b_geotextile_note');
-  const tonsDiv = document.getElementById('b_tons_result');
+let geoState = null;
+function calcGeotextile(){
+  const begin = staToFt(document.getElementById('geo_begin').value);
+  const end = staToFt(document.getElementById('geo_end').value);
+  const width = parseFloat(document.getElementById('geo_width').value);
+  const resDiv = document.getElementById('geo_result');
+  const saveBtn = document.getElementById('geo_save');
 
   if(begin===null || end===null || isNaN(width) || width<=0 || end<=begin){
-    resDiv.innerHTML = ''; saveBtn.disabled = true; baseState = null; geoNote.style.display = 'none';
-    tonsDiv.style.display = 'none'; tonsDiv.innerHTML = '';
+    resDiv.innerHTML = '';
+    saveBtn.disabled = true;
+    geoState = null;
     return;
   }
   const length = end - begin;
   const sy = (length * width) / 9;
-  const hasGeotextile = condition === '12in';
-  const thicknessIn = hasGeotextile ? 12 : 6;
-  const thicknessLabel = hasGeotextile ? '12.0"' : '6.0"';
+  resDiv.innerHTML = `
+    <div class="result">
+      <div><div class="label">${length.toFixed(1)} LF × ${width} FT</div></div>
+      <div><span class="value">${sy.toFixed(1)}</span><span class="unit">SY</span></div>
+    </div>`;
+  geoState = {item:'209-A005 Geotextile Stabilization, Type V, Non-Woven', detail:`Sta ${document.getElementById('geo_begin').value}–${document.getElementById('geo_end').value}, ${width}' wide`, qty:sy, unit:'SY'};
+  saveBtn.disabled = false;
+}
+function saveGeotextile(){
+  if(!geoState) return;
+  addEntry(geoState);
+}
+
+// --- Base: Crushed Stone ---
+function wireCrushedStone(){
+  ['cs_condition','cs_begin','cs_end','cs_width','cs_density'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', calcCrushedStone);
+    document.getElementById(id).addEventListener('change', calcCrushedStone);
+  });
+  document.getElementById('cs_save').addEventListener('click', saveCrushedStone);
+  calcCrushedStone();
+}
+let stoneState = null;
+function calcCrushedStone(){
+  const condition = document.getElementById('cs_condition').value;
+  const begin = staToFt(document.getElementById('cs_begin').value);
+  const end = staToFt(document.getElementById('cs_end').value);
+  const width = parseFloat(document.getElementById('cs_width').value);
+  const density = parseFloat(document.getElementById('cs_density').value); // tons per CY
+  const resDiv = document.getElementById('cs_result');
+  const saveBtn = document.getElementById('cs_save');
+  const tonsDiv = document.getElementById('cs_tons_result');
+
+  stoneState = null;
+
+  if(begin===null || end===null || isNaN(width) || width<=0 || end<=begin){
+    resDiv.innerHTML = '';
+    tonsDiv.style.display = 'none'; tonsDiv.innerHTML = '';
+    saveBtn.disabled = true;
+    return;
+  }
+  const length = end - begin;
+  const sy = (length * width) / 9;
+  const thicknessIn = condition === '12in' ? 12 : 6;
+  const thicknessLabel = condition === '12in' ? '12.0"' : '6.0"';
 
   resDiv.innerHTML = `
     <div class="result">
@@ -1292,7 +1362,6 @@ function calcBase(){
       <div><span class="value">${sy.toFixed(1)}</span><span class="unit">SY</span></div>
     </div>`;
 
-  // Tons estimate: only computed when the user has supplied a real density — never a guessed default.
   if(!isNaN(density) && density > 0){
     const cy = sy * (thicknessIn / 36); // CY = SY × thickness(ft) / 3 = SY × thickness(in) / 36
     const tons = cy * density;
@@ -1301,31 +1370,18 @@ function calcBase(){
       <div class="result" style="background:var(--ink);">
         <div><div class="label">${cy.toFixed(1)} CY × ${density} tons/CY</div></div>
         <div><span class="value">${tons.toFixed(1)}</span><span class="unit">TONS (est.)</span></div>
-      </div>
-      <div class="note" style="margin-top:8px;">
-        Planning estimate only — confirm this density is right for this project's stone before relying on it.
-        The real 304-F003 pay quantity still comes from supplier weigh tickets, not this calculation.
       </div>`;
+    stoneState = {item:'304-F003 Crushed Stone Base', detail:`Sta ${document.getElementById('cs_begin').value}–${document.getElementById('cs_end').value}, ${width}' wide, ${thicknessLabel} depth`, qty:tons, unit:'TONS'};
+    saveBtn.disabled = false;
   } else {
     tonsDiv.style.display = 'none';
     tonsDiv.innerHTML = '';
-  }
-
-  geoNote.style.display = hasGeotextile ? 'block' : 'none';
-  if(hasGeotextile){
-    baseState = {item:'209-A005 Geotextile Stabilization, Type V, Non-Woven', detail:`Sta ${document.getElementById('b_begin').value}–${document.getElementById('b_end').value}, ${width}' wide, under 12" base`, qty:sy, unit:'SY'};
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Geotextile Entry';
-  } else {
-    // 6" curb-integral condition has no geotextile per the typical section legend — nothing to log here.
-    baseState = null;
     saveBtn.disabled = true;
-    saveBtn.textContent = 'No geotextile under 6" base — nothing to save';
   }
 }
-function saveBase(){
-  if(!baseState) return;
-  addEntry(baseState);
+function saveCrushedStone(){
+  if(!stoneState) return;
+  addEntry(stoneState);
 }
 
 // --- Pipe ---
