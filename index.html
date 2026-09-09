@@ -459,22 +459,15 @@ function geotextileCard(){
 function crushedStoneCard(){
   return `
   <div class="card">
-    <h2>Crushed Stone Base</h2>
-    <p class="sub">304-F003 — Crushed Stone Base, paid by the TON. Two conditions apply — pick the one that governs at this station.</p>
-    <div class="field">
-      <label>Condition</label>
-      <select id="cs_condition">
-        <option value="12in">12.0" Crushed Limestone Base — mainline travel-way template (under geotextile)</option>
-        <option value="6in">6.0" Crushed Limestone Base — curb-integral sidewalk sections (no geotextile)</option>
-      </select>
-    </div>
+    <h2>Crushed Stone</h2>
+    <p class="sub">825B Crushed Stone, paid by the TON. Enter the actual placed depth for this location — 12" under mainline travel-way, 6" under curb-integral sections, or whatever depth applies (including temporary driveways).</p>
     <div class="row2">
       <div class="field"><label>Begin Sta</label><input id="cs_begin" inputmode="tel" placeholder="26+45"></div>
       <div class="field"><label>End Sta</label><input id="cs_end" inputmode="tel" placeholder="37+00"></div>
     </div>
-    <div class="field">
-      <label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet for this station range, or field-measure.</span></label>
-      <input id="cs_width" type="number" step="0.1" placeholder="24">
+    <div class="row2">
+      <div class="field"><label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet, or field-measure.</span></label><input id="cs_width" type="number" step="0.1" placeholder="24"></div>
+      <div class="field"><label>Depth (in)</label><input id="cs_depth" type="number" step="0.5" placeholder="12"></div>
     </div>
     <div id="cs_result"></div>
     <div class="field" style="background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:12px; margin-top:12px;">
@@ -483,9 +476,6 @@ function crushedStoneCard(){
       <div id="cs_tons_result" style="display:none; margin-top:10px;"></div>
     </div>
     <button class="save-btn" id="cs_save" disabled>Save Entry</button>
-    <div class="note" style="margin-top:12px;">
-      304-F003 and 209-A005 are separate pay items and are always logged as separate entries, even when both apply to the same footprint. Confirm against supplier weigh tickets if there's ever a discrepancy with this tonnage estimate.
-    </div>
   </div>`;
 }
 
@@ -1325,7 +1315,7 @@ function saveGeotextile(){
 
 // --- Base: Crushed Stone ---
 function wireCrushedStone(){
-  ['cs_condition','cs_begin','cs_end','cs_width','cs_density'].forEach(id=>{
+  ['cs_begin','cs_end','cs_width','cs_depth','cs_density'].forEach(id=>{
     document.getElementById(id).addEventListener('input', calcCrushedStone);
     document.getElementById(id).addEventListener('change', calcCrushedStone);
   });
@@ -1334,10 +1324,10 @@ function wireCrushedStone(){
 }
 let stoneState = null;
 function calcCrushedStone(){
-  const condition = document.getElementById('cs_condition').value;
   const begin = staToFt(document.getElementById('cs_begin').value);
   const end = staToFt(document.getElementById('cs_end').value);
   const width = parseFloat(document.getElementById('cs_width').value);
+  const depthIn = parseFloat(document.getElementById('cs_depth').value);
   const density = parseFloat(document.getElementById('cs_density').value); // tons per CY
   const resDiv = document.getElementById('cs_result');
   const saveBtn = document.getElementById('cs_save');
@@ -1345,7 +1335,7 @@ function calcCrushedStone(){
 
   stoneState = null;
 
-  if(begin===null || end===null || isNaN(width) || width<=0 || end<=begin){
+  if(begin===null || end===null || isNaN(width) || width<=0 || end<=begin || isNaN(depthIn) || depthIn<=0){
     resDiv.innerHTML = '';
     tonsDiv.style.display = 'none'; tonsDiv.innerHTML = '';
     saveBtn.disabled = true;
@@ -1353,17 +1343,16 @@ function calcCrushedStone(){
   }
   const length = end - begin;
   const sy = (length * width) / 9;
-  const thicknessIn = condition === '12in' ? 12 : 6;
-  const thicknessLabel = condition === '12in' ? '12.0"' : '6.0"';
+  const depthLabel = `${depthIn}"`;
 
   resDiv.innerHTML = `
     <div class="result">
-      <div><div class="label">${length.toFixed(1)} LF × ${width} FT · ${thicknessLabel} base</div></div>
+      <div><div class="label">${length.toFixed(1)} LF × ${width} FT · ${depthLabel} depth</div></div>
       <div><span class="value">${sy.toFixed(1)}</span><span class="unit">SY</span></div>
     </div>`;
 
   if(!isNaN(density) && density > 0){
-    const cy = sy * (thicknessIn / 36); // CY = SY × thickness(ft) / 3 = SY × thickness(in) / 36
+    const cy = sy * (depthIn / 36); // CY = SY × depth(ft) / 3 = SY × depth(in) / 36
     const tons = cy * density;
     tonsDiv.style.display = 'block';
     tonsDiv.innerHTML = `
@@ -1371,7 +1360,7 @@ function calcCrushedStone(){
         <div><div class="label">${cy.toFixed(1)} CY × ${density} tons/CY</div></div>
         <div><span class="value">${tons.toFixed(1)}</span><span class="unit">TONS (est.)</span></div>
       </div>`;
-    stoneState = {item:'304-F003 Crushed Stone Base', detail:`Sta ${document.getElementById('cs_begin').value}–${document.getElementById('cs_end').value}, ${width}' wide, ${thicknessLabel} depth`, qty:tons, unit:'TONS'};
+    stoneState = {item:'825B Crushed Stone', detail:`Sta ${document.getElementById('cs_begin').value}–${document.getElementById('cs_end').value}, ${width}' wide, ${depthLabel} depth`, qty:tons, unit:'TONS'};
     saveBtn.disabled = false;
   } else {
     tonsDiv.style.display = 'none';
