@@ -1,7 +1,7 @@
 // Minimal app-shell service worker — makes the tool installable on Android/Chrome
 // and usable with a weak/no signal out in the field. Bump CACHE_NAME on future
 // deploys to force everyone's installed copy to pick up the new version.
-const CACHE_NAME = 'hwy182-tool-v6';
+const CACHE_NAME = 'hwy182-tool-v9';
 const APP_SHELL = [
   './',
   './index.html',
