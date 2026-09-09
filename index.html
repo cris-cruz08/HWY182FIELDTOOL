@@ -329,6 +329,31 @@ function trenchWidthFt(diaIn){
   return (diaIn/12) + 2; // nominal ID (ft) + 1 ft each side
 }
 
+// Existing Pavement Depths table, Sheet TS-3 — 11 borings, gives total existing
+// asphalt+concrete pavement depth by station range. Used to auto-fill the cut depth
+// on the "Cut to Subgrade" card in areas being reconstructed within the existing
+// roadway footprint (cutting through old pavement to reach subgrade). Depths in inches.
+const BORING_DEPTHS = [
+  {boring:'B-1',  from:'20+50', to:'24+50', asphalt:7.0, concrete:8.0, total:15.0},
+  {boring:'B-2',  from:'24+50', to:'29+50', asphalt:9.3, concrete:8.3, total:17.6},
+  {boring:'B-3',  from:'29+50', to:'33+80', asphalt:7.5, concrete:8.3, total:15.8},
+  {boring:'B-4',  from:'33+80', to:'38+70', asphalt:7.0, concrete:8.5, total:15.5},
+  {boring:'B-5',  from:'38+70', to:'44+40', asphalt:5.5, concrete:6.3, total:11.8},
+  {boring:'B-6',  from:'44+40', to:'48+70', asphalt:4.5, concrete:6.0, total:10.5},
+  {boring:'B-7',  from:'48+70', to:'52+90', asphalt:5.5, concrete:5.5, total:11.0},
+  {boring:'B-8',  from:'52+90', to:'57+90', asphalt:4.5, concrete:6.0, total:10.5},
+  {boring:'B-9',  from:'57+90', to:'63+00', asphalt:4.3, concrete:6.0, total:10.0},
+  {boring:'B-10', from:'63+00', to:'67+60', asphalt:3.8, concrete:7.0, total:10.8},
+  {boring:'B-11', from:'67+60', to:'72+80', asphalt:3.8, concrete:6.8, total:10.6}
+];
+function findBoringDepths(beginFt, endFt){
+  // overlap test — returns every boring zone whose applicable range overlaps [beginFt, endFt]
+  return BORING_DEPTHS.filter(b=>{
+    const from = staToFt(b.from), to = staToFt(b.to);
+    return from !== null && to !== null && beginFt < to && endFt > from;
+  });
+}
+
 // ---------- Station helper ----------
 function staToFt(s){
   // accepts "68+20", "68+20.5", or plain feet number
@@ -469,13 +494,15 @@ function removalHTML(){
     {id:'curb', label:'Curb & Gutter'},
     {id:'driveway', label:'Driveway'},
     {id:'sidewalk', label:'Sidewalk'},
-    {id:'sawcut', label:'Saw Cut'}
+    {id:'sawcut', label:'Saw Cut'},
+    {id:'subgrade', label:'Cut to Subgrade'}
   ];
   let effSub;
   if(currentSub === 'asphalt') effSub = 'asphalt';
   else if(currentSub === 'curb') effSub = 'curb';
   else if(currentSub === 'sidewalk') effSub = 'sidewalk';
   else if(currentSub === 'sawcut') effSub = 'sawcut';
+  else if(currentSub === 'subgrade') effSub = 'subgrade';
   else effSub = 'driveway';
   const subtabs = subs.map(s=>`<div class="subtab ${effSub===s.id?'active':''}" data-sub="${s.id}">${s.label}</div>`).join('');
 
@@ -484,9 +511,29 @@ function removalHTML(){
   else if(effSub === 'curb') body = curbCard();
   else if(effSub === 'sidewalk') body = sidewalkCard();
   else if(effSub === 'sawcut') body = sawcutCard();
+  else if(effSub === 'subgrade') body = subgradeCard();
   else body = drivewayCard();
 
   return `<div class="subtabs">${subtabs}</div>${body}`;
+}
+
+function subgradeCard(){
+  return `
+  <div class="card">
+    <h2>Cut to Subgrade</h2>
+    <p class="sub">203-G001 — Excess Excavation, FM, AH. Cutting the roadway prism down to subgrade elevation ahead of geotextile/crushed stone base placement.</p>
+    <div class="row2">
+      <div class="field"><label>Begin Sta</label><input id="sg_begin" inputmode="tel" placeholder="55+68"></div>
+      <div class="field"><label>End Sta</label><input id="sg_end" inputmode="tel" placeholder="57+20"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Width (ft) <span style="font-weight:400; color:var(--concrete);">— read off the governing TS sheet, or field-measure.</span></label><input id="sg_width" type="number" step="0.1" placeholder="24"></div>
+      <div class="field"><label>Cut Depth (ft) <span style="font-weight:400; color:var(--concrete);">— auto-fills from the TS-3 boring table when your stations fall in a single boring's range; override anytime.</span></label><input id="sg_depth" type="number" step="0.1" placeholder="1.0"></div>
+    </div>
+    <div id="sg_boring_ref" class="note" style="display:none; margin-top:8px;"></div>
+    <div id="sg_result"></div>
+    <button class="save-btn" id="sg_save" disabled>Save Entry</button>
+  </div>`;
 }
 
 function asphaltCard(){
@@ -739,6 +786,7 @@ function attachHandlers(){
     else if(currentSub === 'curb') wireCurb();
     else if(currentSub === 'sidewalk') wireSidewalk();
     else if(currentSub === 'sawcut') wireSawcut();
+    else if(currentSub === 'subgrade') wireSubgrade();
     else wireDriveway();
   } else if(currentTab === 'pipe'){
     wirePipe();
@@ -952,6 +1000,73 @@ function calcSawcut(){
 function saveSawcut(){
   if(!sawcutState) return;
   addEntry(sawcutState);
+}
+
+// --- Cut to Subgrade ---
+function wireSubgrade(){
+  ['sg_begin','sg_end','sg_width','sg_depth'].forEach(id=> document.getElementById(id).addEventListener('input', calcSubgrade));
+  document.getElementById('sg_save').addEventListener('click', saveSubgrade);
+  calcSubgrade();
+}
+let subgradeState = null;
+let sgAutoFilledValue = null; // last value we programmatically wrote into sg_depth — lets us tell an untouched auto-fill from a manual override
+function calcSubgrade(){
+  const begin = staToFt(document.getElementById('sg_begin').value);
+  const end = staToFt(document.getElementById('sg_end').value);
+  const width = parseFloat(document.getElementById('sg_width').value);
+  const depthInput = document.getElementById('sg_depth');
+  const boringDiv = document.getElementById('sg_boring_ref');
+  const resDiv = document.getElementById('sg_result');
+  const saveBtn = document.getElementById('sg_save');
+
+  if(begin !== null && end !== null && end > begin){
+    const matches = findBoringDepths(begin, end);
+    if(matches.length === 1){
+      const b = matches[0];
+      const depthFt = b.total / 12;
+      const curVal = parseFloat(depthInput.value);
+      const untouched = depthInput.value === '' || (sgAutoFilledValue !== null && Math.abs(curVal - sgAutoFilledValue) < 0.001);
+      if(untouched){
+        depthInput.value = depthFt.toFixed(2);
+        sgAutoFilledValue = depthFt;
+      }
+      boringDiv.style.display = 'block';
+      boringDiv.innerHTML = `Boring ${b.boring} (Sta ${b.from}–${b.to}): <strong>${b.total.toFixed(1)}"</strong> total existing pavement depth (${b.asphalt.toFixed(1)}" asphalt + ${b.concrete.toFixed(1)}" concrete) — auto-filled below as ${depthFt.toFixed(2)} ft. Override if field conditions differ.`;
+    } else if(matches.length > 1){
+      boringDiv.style.display = 'block';
+      boringDiv.innerHTML = `This range spans multiple boring zones (${matches.map(b=>`${b.boring}: ${b.total.toFixed(1)}"`).join(', ')}) — depth not auto-filled, enter manually.`;
+      sgAutoFilledValue = null;
+    } else {
+      boringDiv.style.display = 'none';
+      boringDiv.innerHTML = '';
+      sgAutoFilledValue = null;
+    }
+  } else {
+    boringDiv.style.display = 'none';
+    boringDiv.innerHTML = '';
+  }
+
+  const depth = parseFloat(depthInput.value);
+
+  if(begin===null || end===null || isNaN(width) || width<=0 || end<=begin || isNaN(depth) || depth<=0){
+    resDiv.innerHTML = '';
+    saveBtn.disabled = true;
+    subgradeState = null;
+    return;
+  }
+  const length = end - begin;
+  const cy = (length * width * depth) / 27;
+  resDiv.innerHTML = `
+    <div class="result">
+      <div><div class="label">${length.toFixed(1)} LF × ${width} FT × ${depth} FT deep</div></div>
+      <div><span class="value">${cy.toFixed(1)}</span><span class="unit">CY</span></div>
+    </div>`;
+  subgradeState = {item:'203-G001 Excess Excavation, FM, AH', detail:`Sta ${document.getElementById('sg_begin').value}–${document.getElementById('sg_end').value}, ${width}' wide, ${depth}' cut to subgrade`, qty:cy, unit:'CY'};
+  saveBtn.disabled = false;
+}
+function saveSubgrade(){
+  if(!subgradeState) return;
+  addEntry(subgradeState);
 }
 
 // --- Driveway ---
