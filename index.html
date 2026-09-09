@@ -635,7 +635,7 @@ function pipeHTML(){
       <div class="field"><label>End Sta</label><input id="p_end" inputmode="tel" placeholder="64+05"></div>
     </div>
     <div class="field">
-      <label>LF Override <span style="font-weight:400; color:var(--concrete);">(use for cross-drains / N&amp;S runs where station delta ≠ pipe length)</span></label>
+      <label>Already Have the Pipe LF? <span style="font-weight:400; color:var(--concrete);">If you already have the LF of pipe installed (inspector-reported, as-built, or for cross-drains/N&amp;S runs where station delta ≠ pipe length), put it here — otherwise leave blank to use the station delta.</span></label>
       <input id="p_lf_override" type="number" step="0.1" placeholder="leave blank to use station delta">
     </div>
     <div id="p_design_box" style="display:none;"></div>
@@ -1436,12 +1436,15 @@ function calcPipe(){
 
   resDiv.innerHTML = `
     <div class="result">
-      <div><div class="label">${lf.toFixed(1)} LF trench (${lengthSource}) · width ${trenchW.toFixed(2)} FT</div></div>
+      <div><div class="label">Structure Excavation — ${lf.toFixed(1)} LF trench (${lengthSource}) · width ${trenchW.toFixed(2)} FT · ${depth}' deep</div></div>
       <div><span class="value">${structCY.toFixed(1)}</span><span class="unit">CY</span></div>
     </div>
     ${fallbackWarningHTML}
-    <div class="note">
-      Pipe furnish &amp; install: <strong>${pipeLF.toFixed(1)} LF</strong> of ${size}" ${material}${dual ? ' (dual lay, 2 runs)':''}.<br>
+    <div class="result" style="background:var(--ink); margin-top:10px;">
+      <div><div class="label">Pipe — ${size}" ${material}${dual ? ' (dual lay, 2 runs)':''}</div></div>
+      <div><span class="value">${pipeLF.toFixed(1)}</span><span class="unit">LF</span></div>
+    </div>
+    <div class="note" style="margin-top:10px;">
       Trench width source: ${material==='RCP' ? 'pipe OD + 1 ft each side, per PE (2026-09-04) — OD from ASTM C76 Wall B thickness' : 'MDOT DPD-1 Table 1'}${dual ? `, using ${effectiveSize}" equivalent per dual-lay convention` : ''}.
     </div>
   `;
