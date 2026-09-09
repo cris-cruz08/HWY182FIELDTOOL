@@ -77,14 +77,14 @@
   main{max-width:560px; margin:0 auto; padding:16px;}
 
   .subtabs{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
-  .subtab{
+  .subtab,.scmode{
     flex:1 1 auto; text-align:center;
     background:var(--paper); border:1.5px solid var(--line);
     color:var(--ink-soft); font-weight:700; font-size:13px;
     padding:10px 8px; border-radius:8px; cursor:pointer;
     min-width:90px;
   }
-  .subtab.active{
+  .subtab.active,.scmode.active{
     background:var(--ink); color:var(--yellow); border-color:var(--ink);
   }
 
@@ -406,6 +406,7 @@ function showToast(msg){
 // ---------- Tabs ----------
 let currentTab = 'removal';
 let currentSub = 'asphalt';
+let sawcutMode = 'corridor';
 document.querySelectorAll('nav.tabbar button').forEach(b=>{
   b.addEventListener('click', ()=>{
     currentTab = b.dataset.tab;
@@ -530,10 +531,29 @@ function curbCard(){
 }
 
 function sawcutCard(){
+  const modeToggle = `
+    <div class="subtabs" style="margin-bottom:14px;">
+      <div class="scmode ${sawcutMode==='corridor'?'active':''}" data-scmode="corridor">Corridor Run</div>
+      <div class="scmode ${sawcutMode==='direct'?'active':''}" data-scmode="direct">Direct Entry</div>
+    </div>`;
+
+  if(sawcutMode === 'direct'){
+    return `
+    <div class="card">
+      <h2>Saw Cut, Full Depth</h2>
+      <p class="sub">503-C010 — linear feet, as measured or reported in the field</p>
+      ${modeToggle}
+      <div class="field"><label>Location</label><input id="sc_loc" placeholder="e.g. Sta 63+55 NS to 63+65 RT"></div>
+      <div class="field"><label>LF</label><input id="sc_lf" type="number" step="0.1" placeholder="56"></div>
+      <button class="save-btn" id="sc_save_direct" disabled>Save Entry</button>
+    </div>`;
+  }
+
   return `
   <div class="card">
     <h2>Saw Cut, Full Depth</h2>
     <p class="sub">503-C010 — linear feet along the cut line, less gaps (driveways, side streets, existing joints)</p>
+    ${modeToggle}
     <div class="row2">
       <div class="field"><label>Begin Sta</label><input id="sc_begin" inputmode="tel" placeholder="24+50"></div>
       <div class="field"><label>End Sta</label><input id="sc_end" inputmode="tel" placeholder="28+45"></div>
@@ -892,6 +912,17 @@ function saveCurb(){
 }
 
 function wireSawcut(){
+  document.querySelectorAll('.scmode').forEach(el=>{
+    el.addEventListener('click', ()=>{ sawcutMode = el.dataset.scmode; render(); });
+  });
+
+  if(sawcutMode === 'direct'){
+    ['sc_loc','sc_lf'].forEach(id=> document.getElementById(id).addEventListener('input', calcSawcutDirect));
+    document.getElementById('sc_save_direct').addEventListener('click', saveSawcutDirect);
+    calcSawcutDirect();
+    return;
+  }
+
   document.getElementById('sc_addgap').addEventListener('click', ()=>{
     addSawcutGapRow();
     calcSawcut();
@@ -900,6 +931,26 @@ function wireSawcut(){
   document.getElementById('sc_save').addEventListener('click', saveSawcut);
   addSawcutGapRow(); // start with one
   calcSawcut();
+}
+let sawcutDirectState = null;
+function calcSawcutDirect(){
+  const loc = document.getElementById('sc_loc').value.trim();
+  const lf = parseFloat(document.getElementById('sc_lf').value);
+  const saveBtn = document.getElementById('sc_save_direct');
+  if(!loc || isNaN(lf) || lf<=0){
+    sawcutDirectState = null;
+    saveBtn.disabled = true;
+    return;
+  }
+  sawcutDirectState = {item:'503-C010 Saw Cut, Full Depth', detail:loc, qty:lf, unit:'LF'};
+  saveBtn.disabled = false;
+}
+function saveSawcutDirect(){
+  if(!sawcutDirectState) return;
+  addEntry(sawcutDirectState);
+  document.getElementById('sc_loc').value = '';
+  document.getElementById('sc_lf').value = '';
+  calcSawcutDirect();
 }
 function addSawcutGapRow(){
   const wrap = document.getElementById('sc_gaps');
