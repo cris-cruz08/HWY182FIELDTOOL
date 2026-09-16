@@ -216,6 +216,22 @@
   .toprow button.primary{background:var(--ink); color:var(--yellow); border-color:var(--ink);}
 
   .empty{text-align:center; color:var(--concrete); font-size:13px; padding:30px 10px;}
+
+  .ref-group{margin-bottom:10px;}
+  .ref-code{
+    font-size:13px; font-weight:800; color:var(--ink);
+    display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;
+    background:var(--paper); border:1.5px solid var(--line); border-radius:8px;
+    padding:12px 14px; cursor:pointer; user-select:none;
+  }
+  .ref-code .chev{color:var(--yellow-deep); font-size:11px; width:10px; flex-shrink:0;}
+  .ref-code .n{font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;}
+  .ref-code .d{font-weight:700; color:var(--ink-soft); font-size:12.5px;}
+  .ref-terms{padding:8px 0 0 4px;}
+  .ref-term{
+    background:#fff; border:1.5px solid var(--line); border-radius:8px;
+    padding:9px 12px; margin-bottom:6px; font-size:13.5px;
+  }
 </style>
 </head>
 <body>
@@ -240,6 +256,7 @@
   <button data-tab="pipe"><span class="ic">◎</span>Pipe</button>
   <button data-tab="base"><span class="ic">▭</span>Base</button>
   <button data-tab="log"><span class="ic">≣</span>Log</button>
+  <button data-tab="reference"><span class="ic">▤</span>Reference</button>
 </nav>
 
 <script>
@@ -428,6 +445,7 @@ function render(){
   if(currentTab === 'removal') main.innerHTML = removalHTML();
   else if(currentTab === 'pipe') main.innerHTML = pipeHTML();
   else if(currentTab === 'base') main.innerHTML = baseHTML();
+  else if(currentTab === 'reference') main.innerHTML = referenceHTML();
   else main.innerHTML = logHTML();
   attachHandlers();
 }
@@ -774,6 +792,160 @@ function renderLog(){
   if(currentTab === 'log') render();
 }
 
+// ---------- Reference tab (HCSS/SOV crosswalk) ----------
+// Standalone lookup only — not wired into any calculator or the Log/CSV export.
+// Update this list by hand when the HCSS/SOV crosswalk spreadsheet changes.
+const CROSSWALK = [
+  {code:"110000", desc:"General Conditions", term:"Decorative Park Bench", tbd:false},
+  {code:"110000", desc:"General Conditions", term:"Litter Receptacles", tbd:false},
+  {code:"140000", desc:"Exploratory Work", term:"Not yet defined", tbd:true},
+  {code:"150000", desc:"Traffic Control", term:"Maintenance of Traffic", tbd:false},
+  {code:"156000", desc:"Safety Fence", term:"Safety Fence", tbd:false},
+  {code:"241000", desc:"Remove Utilities", term:"Removal of Box Culvert", tbd:false},
+  {code:"241000", desc:"Remove Utilities", term:"Removal of Inlets All Sizes", tbd:false},
+  {code:"241000", desc:"Remove Utilities", term:"Removal of Manhole", tbd:false},
+  {code:"241000", desc:"Remove Utilities", term:"Removal of Fence All Types", tbd:false},
+  {code:"241000", desc:"Remove Utilities", term:"Flowable Fill, Excavatable", tbd:false},
+  {code:"241130", desc:"Remove Asphalt and Concrete", term:"Removal of Concrete Driveways All Depths", tbd:false},
+  {code:"241130", desc:"Remove Asphalt and Concrete", term:"Removal of Concrete Paved Ditch", tbd:false},
+  {code:"241130", desc:"Remove Asphalt and Concrete", term:"Removal of Asphalt Pavement All Depths", tbd:false},
+  {code:"241130", desc:"Remove Asphalt and Concrete", term:"Removal of Concrete Pavement w/ Variable Depth Overlay", tbd:false},
+  {code:"241170", desc:"Remove Curb and Gutter", term:"Removal of Curb & Gutter All Types", tbd:false},
+  {code:"241180", desc:"Remove Sidewalk", term:"Removal of Concrete Sidewalk", tbd:false},
+  {code:"241190", desc:"Sawcut Concrete - Bulk", term:"Saw Cut Full Depth", tbd:false},
+  {code:"311100", desc:"Clear & Grub- Light", term:"Clearing and Grubbing", tbd:false},
+  {code:"311410", desc:"Redistribute Topsoil Mis", term:"Topsoil for Plan Holes, Contractor Furnished", tbd:false},
+  {code:"312300", desc:"Unclassified", term:"Unclassified Excavation FM AH", tbd:false},
+  {code:"312310", desc:"Pipe Select Fill", term:"Borrow Excavation AH FME Class B9-6", tbd:false},
+  {code:"312320", desc:"Pipe haul off", term:"Excess Excavation FM AH", tbd:false},
+  {code:"312500", desc:"Sand Bags", term:"Rockbags", tbd:false},
+  {code:"312515", desc:"Seed and Straw - 2+ ACRE", term:"Grassing", tbd:false},
+  {code:"312515", desc:"Seed and Straw - 2+ ACRE", term:"Temporary Grassing", tbd:false},
+  {code:"312520", desc:"Silt fence", term:"Temporary Silt Fence", tbd:false},
+  {code:"312530", desc:"Wattles", term:"Wattles 20\"", tbd:false},
+  {code:"313700", desc:"Rip Rap #100", term:"Riprap for Erosion Control", tbd:false},
+  {code:"321100", desc:"Geotextile", term:"Geotextile Stabilization Type V Non-Woven", tbd:false},
+  {code:"321123", desc:"825b Limestone", term:"Size 825B Crushed Stone Base", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Stamped and Colored Concrete Sidewalk", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Concrete Curb Header", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Concrete Curb Special Design", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Combination Concrete Curb and Gutter Type 2", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Combination Concrete Curb and Gutter Type 2 Modified", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Combination Concrete Curb and Gutter Type 3B Modified", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Concrete Driveway w/ Reinforcement 6in Thickness", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Concrete Median and/or Island Pavement 10in", tbd:false},
+  {code:"321150", desc:"Base Fine Grade", term:"Concrete Unit Pavers Within Landscape", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Temporary Traffic Stripe Continuous White", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Temporary Traffic Stripe Continuous Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Temporary Traffic Stripe Detail Paint", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Temporary Traffic Stripe Legend Paint", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"4\" Thermoplastic Traffic Stripe Continuous White", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"4\" Thermoplastic Edge Stripe Continuous White", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"4\" Thermoplastic Traffic Stripe Skip Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"4\" Thermoplastic Traffic Stripe Continuous Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"4\" Thermoplastic Edge Stripe Continuous Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Thermoplastic Detail Stripe White", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Thermoplastic Detail Stripe Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Thermoplastic Legend White", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Thermoplastic Legend Yellow", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Red-Clear Reflective High Performance Raised Markers", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Two-Way Yellow Reflective High Performance Raised Markers", tbd:false},
+  {code:"321200", desc:"Asphalt patching", term:"Thermoplastic Legend Green", tbd:false},
+  {code:"334100", desc:"36\"x23\" RCAP", term:"36\" x 23\" Concrete Arch Pipe Class A3", tbd:false},
+  {code:"334126", desc:"18 HP", term:"18\" Type A Alternate Pipe Corrugated Polypropylene Pipe", tbd:false},
+  {code:"334128", desc:"24 HP", term:"24\" Type A Alternate Pipe Corrugated Polypropylene Pipe", tbd:false},
+  {code:"334132", desc:"30 HP", term:"30\" Type A Alternate Pipe Corrugated Polypropylene Pipe", tbd:false},
+  {code:"334134", desc:"36 HP", term:"36\" Type A Alternate Pipe Corrugated Polypropylene Pipe", tbd:false},
+  {code:"334146", desc:"18 RCP", term:"18\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334148", desc:"24 RCP", term:"24\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334151", desc:"30 RCP", term:"30\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334152", desc:"36 RCP", term:"36\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334153", desc:"42 RCP", term:"42\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334154", desc:"48 RCP", term:"48\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334155", desc:"60 RCP", term:"60\" Reinforced Concrete Pipe Class 3", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"18\" Reinforced Concrete End Section", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"24\" Reinforced Concrete End Section", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"Castings, Gratings", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"New Drain Inlet Per Plans", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"Precast Manhole, 48\" Diameter", tbd:false},
+  {code:"334180", desc:"Inlets & FES", term:"Precast Manhole, 72\" Diameter", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.06 1 x 2\" MV Duct in Bored Hole Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.07 3 x 2\" MV Duct in Bored Hole Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.08 4 x 2\" MV Duct in Bored Hole Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.09 4 x 3\" MV Duct in Bored Hole Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.01 4 x 2\" MV Ductbank Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.02 1 x 3\" MV Ductbank Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.03 4 x 3\" MV Ductbank Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.04 5 x 3\" MV Ductbank Installed", tbd:false},
+  {code:"337000", desc:"Duct Bank", term:"33 17 19.05 8 x 3\" MV Ductbank Installed", tbd:false},
+  {code:"337002", desc:"Electrical", term:"Not yet defined", tbd:true},
+  {code:"359000", desc:"Irrigation Sleeves", term:"Sleeves 6in Diameter", tbd:false},
+  {code:"359002", desc:"Sod", term:"Solid Sodding Bermuda", tbd:false},
+  {code:"900001", desc:"Overhead", term:"Not yet defined", tbd:true},
+  {code:"900401", desc:"CO #1 Unsuitable soil und", term:"Not yet defined", tbd:true},
+  {code:"950101", desc:"DNA re-work", term:"Not yet defined", tbd:true},
+  {code:"950102", desc:"DNA Water line", term:"Not yet defined", tbd:true},
+  {code:"950103", desc:"12\" Existing Pipe Repair", term:"Not yet defined", tbd:true},
+  {code:"950104", desc:"8\" SDR Pipe - Burns Insta", term:"Not yet defined", tbd:true},
+  {code:"950105", desc:"6\" SDR Pipe", term:"Not yet defined", tbd:true},
+  {code:"950106", desc:"10\" SDR Pipe", term:"Not yet defined", tbd:true},
+  {code:"991000", desc:"T&M Extra Work", term:"Not yet defined", tbd:true}
+];
+
+function referenceHTML(){
+  return `
+  <div class="card">
+    <h2>Reference Descriptions</h2>
+    <p class="sub">Read-Only Reference</p>
+    <div id="ref_results"></div>
+  </div>`;
+}
+
+function groupCrosswalkRows(rows){
+  const groups = [];
+  let last = null;
+  rows.forEach(r=>{
+    if(!last || last.code !== r.code){
+      last = {code:r.code, desc:r.desc, terms:[]};
+      groups.push(last);
+    }
+    last.terms.push(r);
+  });
+  return groups;
+}
+
+let refExpanded = new Set();
+
+function renderReference(){
+  const results = document.getElementById('ref_results');
+  if(!results) return;
+  const defined = CROSSWALK.filter(r => !r.tbd);
+  const groups = groupCrosswalkRows(defined);
+  results.innerHTML = groups.map(g => {
+    const open = refExpanded.has(g.code);
+    return `
+    <div class="ref-group">
+      <div class="ref-code" data-code="${g.code}">
+        <span class="chev">${open ? '▾' : '▸'}</span>
+        <span class="n">${g.code}</span><span class="d">— ${g.desc}</span>
+      </div>
+      ${open ? `<div class="ref-terms">${g.terms.map(t => `<div class="ref-term">${t.term}</div>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+  results.querySelectorAll('.ref-code').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const code = el.dataset.code;
+      if(refExpanded.has(code)) refExpanded.delete(code);
+      else refExpanded.add(code);
+      renderReference();
+    });
+  });
+}
+
+function wireReference(){
+  renderReference();
+}
+
 // ---------- Handlers ----------
 function attachHandlers(){
   // subtabs
@@ -793,6 +965,8 @@ function attachHandlers(){
   } else if(currentTab === 'base'){
     if(currentSub === 'geotextile') wireGeotextile();
     else wireCrushedStone();
+  } else if(currentTab === 'reference'){
+    wireReference();
   } else {
     const exp = document.getElementById('exportCsv');
     if(exp) exp.addEventListener('click', exportCSV);
